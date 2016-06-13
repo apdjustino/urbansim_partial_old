@@ -2,6 +2,10 @@ import orca
 import pandas as pd
 import numpy as np
 from urbansim.utils.misc import reindex
+import zones
+import households
+import parcels
+import buildings
 
 @orca.column('establishments', 'sector_id_six', cache=True)
 def sector_id_six(establishments):

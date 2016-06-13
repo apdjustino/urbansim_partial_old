@@ -2,6 +2,11 @@ import orca
 import pandas as pd
 import numpy as np
 from urbansim.utils.misc import reindex
+import dataset
+import zones
+import households
+import establishments
+import parcels
 
 @orca.column('buildings', 'vacant_residential_units')
 def vacant_residential_units(buildings, households):
@@ -108,34 +113,26 @@ def county8123(buildings):
 
 @orca.column('buildings', 'percent_hh_with_child_x_hh_with_child', cache=True, cache_scope='iteration')
 def percent_hh_with_child_x_hh_with_child(buildings, households, parcels, zones):
-    building_zones = pd.Series(index=buildings.index)
-    hh_zones = pd.Series(index=households.index)
-    b_zone_id = parcels.zone_id.loc[buildings.parcel_id]
-    building_zones.loc[:] = b_zone_id.values
-    hh_zone_id = building_zones.loc[households.building_id]
-    hh_zones.loc[:] = hh_zone_id.values
-    percent_hh_with_child = zones.percent_hh_with_child
-    percent_hh_with_child_x_hh_with_child = percent_hh_with_child * households.hh_with_child.groupby(hh_zones).size()
 
-    series = pd.Series(index=buildings.index)
-    series.loc[:] = percent_hh_with_child_x_hh_with_child[building_zones].values
+    percent_hh_with_child = zones.percent_hh_with_child
+    b_zone_ids = reindex(parcels.zone_id, buildings.parcel_id)
+    hh_zones = pd.Series(b_zone_ids.loc[households.building_id].values, index=households.index)
+    percent_hh_with_child_x_hh_with_child_test = percent_hh_with_child * households.hh_with_child.groupby(hh_zones).size()
+    series = pd.Series(percent_hh_with_child_x_hh_with_child_test[b_zone_ids].values, index=buildings.index)
+
     return series
 
 @orca.column('buildings', 'employees_x_ln_non_residential_sqft_zone', cache=True, cache_scope='iteration')
 def employees_x_ln_non_residential_sqft_zone(buildings, establishments, parcels, zones):
-    building_zones = pd.Series(index=buildings.index)
-    e_zones = pd.Series(index=establishments.index)
-    b_zone_id = parcels.zone_id.loc[buildings.parcel_id]
-    building_zones.loc[:] = b_zone_id.values
-    e_zone_id = building_zones.loc[establishments.building_id]
-    e_zones.loc[:] = e_zone_id.values
+    b_zone_ids = reindex(parcels.zone_id, buildings.parcel_id)
+    e_zone_ids = pd.Series(b_zone_ids.loc[establishments.building_id].values, index=establishments.index)
+    employees = establishments.employees.groupby(e_zone_ids).sum()
 
-    ln_non_residential_sqft_zone = buildings.non_residential_sqft.groupby(building_zones).sum().apply(np.log1p)
-    employees = establishments.employees.groupby(e_zones).sum()
+    ln_non_residential_sqft_zone = buildings.non_residential_sqft.groupby(b_zone_ids).sum().apply(np.log1p)
     employees_x_ln_non_residential_sqft_zone = employees * ln_non_residential_sqft_zone
-    series = pd.Series(index=buildings.index)
-    series.loc[:] = employees_x_ln_non_residential_sqft_zone[building_zones].values
-    return series
+
+    return pd.Series(employees_x_ln_non_residential_sqft_zone[b_zone_ids].values, index=buildings.index)
+
 
 @orca.column('buildings', 'wkrs_hhs_x_ln_jobs_within_30min', cache=True, cache_scope='iteration')
 def wkrs_hhs_x_ln_jobs_within_30min(buildings, households, parcels, zones):
@@ -176,3 +173,5 @@ def percent_younghead_x_younghead(buildings, households, zones,parcels):
     younghead = households.age_of_head.groupby(hh_data).size()
     percent_younghead_x_younghead = percent_younghead * younghead
     return reindex(percent_younghead_x_younghead, building_data)
+
+print orca.get_table('buildings').to_frame(['employees_x_ln_non_residential_sqft_zone'])

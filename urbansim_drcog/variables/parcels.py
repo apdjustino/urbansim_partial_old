@@ -1,6 +1,11 @@
 import orca
 import pandas as pd
 import numpy as np
+import dataset
+import zones
+import households
+import establishments
+import buildings
 from urbansim.utils.misc import reindex
 
 
@@ -58,24 +63,15 @@ def land_cost(parcels):
 
 @orca.column('parcels', 'ave_res_unit_size')
 def ave_unit_size(parcels, buildings):
-    building_zone = pd.Series(index=buildings.index)
-    b_zone_id = parcels.zone_id.loc[buildings.parcel_id]
-    building_zone.loc[:] = b_zone_id.values
-    series = pd.Series(index=parcels.index)
-    zonal_sqft_per_unit = buildings.sqft_per_unit.groupby(building_zone).mean()
-    series.loc[:] = zonal_sqft_per_unit[parcels.zone_id].values
-    series = series.fillna(1500)
-    return series
+    zoneIds = reindex(parcels.zone_id, buildings.parcel_id)
+    zonal_sqft_per_unit = buildings.sqft_per_unit.groupby(zoneIds).mean()
+    return pd.Series(zonal_sqft_per_unit[parcels.zone_id].values, index=parcels.index).fillna(1500)
 
 @orca.column('parcels', 'ave_non_res_unit_size')
 def ave_unit_size(parcels, sqft_per_job):
-    series = pd.Series(index=parcels.index)
     sqft = sqft_per_job.to_frame().reset_index()
     zonal_sqft = sqft.groupby('zone_id').building_sqft_per_job.mean()
-    series.loc[:] = zonal_sqft[parcels.zone_id].values
-    series = series.fillna(400)
-    return series
-
+    return pd.Series(zonal_sqft[parcels.zone_id].values, index=parcels.index).fillna(1500)
 
 @orca.column('parcels', 'total_units', cache=True, cache_scope='iteration')
 def total_units(parcels, buildings):
