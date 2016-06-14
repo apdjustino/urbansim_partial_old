@@ -1,25 +1,52 @@
 import orca
 import pandas as pd
+import numpy as np
+import scp
+import timeit
 
 
 ######This module registers the necessary data tables into the orca pipeline#######
 orca.add_injectable("store",pd.HDFStore('C:/urbansim2/urbansim/urbansim_drcog/data/drcog.h5', mode='r'))
 
+@orca.table('zone_redevelopment', cache=True)
+def zone_redevelopment():
+    return pd.read_csv('C:/urbansim2/urbansim/urbansim_drcog/data/zone_redevelopments.csv')
+
 @orca.table('buildings', cache=True)
-def buildings(store):
-    return store['buildings']
+def buildings(store, zone_redevelopment):
+    b = store['buildings']
+    b_removed_idx = b.loc[np.in1d(b.parcel_id, zone_redevelopment.parcel_id)].index
+    print b.shape
+    return b.loc[~np.in1d(b.index, b_removed_idx)]
 
 @orca.table('parcels', cache=True)
-def parcels(store):
-    return store['parcels'].set_index('parcel_id')
+def parcels(store, zone_redevelopment):
 
-@orca.table('households', cache=False)
-def households(store):
-    return store['households']
+    p = pd.read_csv('C:/urbansim2/urbansim/urbansim_drcog/data/parcels_fars.csv').set_index('parcel_id').rename(columns={'far':'new_far'})
+    zone_dev = pd.read_csv('C:/urbansim2/urbansim/urbansim_drcog/data/zone_development.csv')
+    parcels_with_new = scp.split_function(p, zone_dev, demo_ids=zone_redevelopment.parcel_id)
+    return parcels_with_new
 
-@orca.table('establishments', cache=False)
-def establishments(store):
-    return store['establishments']
+@orca.table('households', cache=True)
+def households(store, zone_redevelopment):
+    hh = store['households']
+    b = store['buildings']
+    b_removed_idx = b.loc[np.in1d(b.parcel_id, zone_redevelopment.parcel_id)].index
+    hh.loc[np.in1d(b_removed_idx, hh.building_id), 'zone_id'] = -1
+    hh.loc[np.in1d(b_removed_idx, hh.building_id), 'building_id'] = -1
+
+
+    return hh
+
+@orca.table('establishments', cache=True)
+def establishments(store, zone_redevelopment):
+    e = store['establishments']
+    b = store['buildings']
+    b_removed_idx = b.loc[np.in1d(b.parcel_id, zone_redevelopment.parcel_id)].index
+    e = e.loc[e.employees > 0]
+    e.loc[np.in1d(b_removed_idx, e.building_id), 'zone_id'] = -1
+    e.loc[np.in1d(b_removed_idx, e.building_id), 'building_id'] = -1
+    return e
 
 @orca.table('zones', cache=True)
 def zones(store):
@@ -100,3 +127,4 @@ orca.broadcast('buildings','households_for_estimation', cast_index=True, onto_on
 orca.broadcast('counties', 'establishments', cast_index=True, onto_on='zone_id')
 orca.broadcast('counties', 'households', cast_index=True, onto_on='zone_id')
 
+print orca.get_table('parcels').to_frame().shape
