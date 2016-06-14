@@ -4,8 +4,7 @@ import numpy as np
 
 def split_function(parcels, selected_zones, demo_ids=None):
 
-    pcoord = parcels.loc[(np.in1d(parcels.zone_id, list(selected_zones.zone_id))) & (np.in1d(parcels.index, demo_ids))]
-
+    pcoord = parcels.loc[(parcels.zone_id.isin(list(selected_zones.zone_id))) | (parcels.index.isin(demo_ids))]
 
     num_points = (np.ceil(pcoord['parcel_sqft']/200000)).astype('int32')
     num_points = num_points[num_points >1]

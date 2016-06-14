@@ -173,5 +173,3 @@ def percent_younghead_x_younghead(buildings, households, zones,parcels):
     younghead = households.age_of_head.groupby(hh_data).size()
     percent_younghead_x_younghead = percent_younghead * younghead
     return reindex(percent_younghead_x_younghead, building_data)
-
-print orca.get_table('buildings').to_frame(['employees_x_ln_non_residential_sqft_zone'])

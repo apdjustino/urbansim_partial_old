@@ -2,11 +2,14 @@ import orca
 import pandas as pd
 import numpy as np
 import scp
-import timeit
 
 
 ######This module registers the necessary data tables into the orca pipeline#######
 orca.add_injectable("store",pd.HDFStore('C:/urbansim2/urbansim/urbansim_drcog/data/drcog.h5', mode='r'))
+
+@orca.table('counties', cache=True)
+def counties():
+    return pd.read_csv('C:/urbansim2/urbansim/urbansim_drcog/data/TAZ_County_Table.csv').set_index('zone_id')
 
 @orca.table('zone_redevelopment', cache=True)
 def zone_redevelopment():
@@ -16,7 +19,6 @@ def zone_redevelopment():
 def buildings(store, zone_redevelopment):
     b = store['buildings']
     b_removed_idx = b.loc[np.in1d(b.parcel_id, zone_redevelopment.parcel_id)].index
-    print b.shape
     return b.loc[~np.in1d(b.index, b_removed_idx)]
 
 @orca.table('parcels', cache=True)
@@ -43,9 +45,11 @@ def establishments(store, zone_redevelopment):
     e = store['establishments']
     b = store['buildings']
     b_removed_idx = b.loc[np.in1d(b.parcel_id, zone_redevelopment.parcel_id)].index
+    zone_ids = orca.merge_tables('buildings', tables=['buildings','parcels'], columns=['zone_id']).zone_id
     e = e.loc[e.employees > 0]
-    e.loc[np.in1d(b_removed_idx, e.building_id), 'zone_id'] = -1
-    e.loc[np.in1d(b_removed_idx, e.building_id), 'building_id'] = -1
+    e.loc[e.building_id.isin(b_removed_idx), 'building_id'] = -1
+    e.loc[:, 'zone_id'] = zone_ids[e.building_id].fillna(-1).values.astype('int32')
+    e.zone_id.fillna(-1)
     return e
 
 @orca.table('zones', cache=True)
@@ -90,7 +94,7 @@ def household_control_totals():
 
 @orca.table('employment_control_totals', cache=True)
 def employment_control_totals():
-    return ''
+    return pd.read_csv('C:/urbansim2/urbansim/urbansim_drcog/data/emp_growth.csv', index_col=0)
 
 @orca.table('zoning', cache=True)
 def zoning():
@@ -126,5 +130,3 @@ orca.broadcast('counties','zones', cast_index=True, onto_index=True)
 orca.broadcast('buildings','households_for_estimation', cast_index=True, onto_on='building_id')
 orca.broadcast('counties', 'establishments', cast_index=True, onto_on='zone_id')
 orca.broadcast('counties', 'households', cast_index=True, onto_on='zone_id')
-
-print orca.get_table('parcels').to_frame().shape
