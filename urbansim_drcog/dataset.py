@@ -29,13 +29,14 @@ def parcels(store, zone_redevelopment):
     parcels_with_new = scp.split_function(p, zone_dev, demo_ids=zone_redevelopment.parcel_id)
     return parcels_with_new
 
-@orca.table('households', cache=True)
+@orca.table('households', cache=False)
 def households(store, zone_redevelopment):
     hh = store['households']
     b = store['buildings']
     b_removed_idx = b.loc[np.in1d(b.parcel_id, zone_redevelopment.parcel_id)].index
     hh.loc[np.in1d(b_removed_idx, hh.building_id), 'zone_id'] = -1
     hh.loc[np.in1d(b_removed_idx, hh.building_id), 'building_id'] = -1
+    hh.loc[:, 'adults'] = hh.persons - hh.children
 
 
     return hh
@@ -90,7 +91,7 @@ def job_relocation_rates(store):
 
 @orca.table('household_control_totals', cache=True)
 def household_control_totals():
-    return ''
+    return pd.read_csv('C:/urbansim2/urbansim/urbansim_drcog/data/hh_controls.csv', index_col=0)
 
 @orca.table('employment_control_totals', cache=True)
 def employment_control_totals():
@@ -130,3 +131,4 @@ orca.broadcast('counties','zones', cast_index=True, onto_index=True)
 orca.broadcast('buildings','households_for_estimation', cast_index=True, onto_on='building_id')
 orca.broadcast('counties', 'establishments', cast_index=True, onto_on='zone_id')
 orca.broadcast('counties', 'households', cast_index=True, onto_on='zone_id')
+
