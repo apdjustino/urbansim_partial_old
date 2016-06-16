@@ -34,6 +34,8 @@ def emp_relocation(establishments, job_relocation_rates):
     movers = emp_relo_model.find_movers(establishments.to_frame())
 
     print "%d agents relocating" % len(movers)
+    establishments.update_col_from_series(field_name, pd.Series(-1, index=movers))
+    establishments.update_col_from_series('building_id', pd.Series(-1, index=movers))
 
 
 @orca.step('hh_transition')
@@ -50,3 +52,18 @@ def hh_transition(households, household_control_totals, year):
     orca.add_table('households', df.loc[:, orca.get_table('households').local_columns])
 
     print df.groupby('county_id').persons.sum()
+
+@orca.step('hh_relocation')
+def hh_relocation(households, household_relocation_rates):
+    field_name = 'zone_id'
+    choosers = households
+    print "Total agents: %d" % len(choosers)
+    drcog_utils._print_number_unplaced(choosers, field_name)
+
+    print "Assigning for relocation..."
+    hh_relo_model = RelocationModel(household_relocation_rates.to_frame(), rate_column='probability_of_relocating')
+    movers = hh_relo_model.find_movers(choosers.to_frame())
+
+    print "%d agents relocating" % len(movers)
+    choosers.update_col_from_series(field_name, pd.Series(-1, index=movers))
+    choosers.update_col_from_series('building_id', pd.Series(-1, index=movers))
